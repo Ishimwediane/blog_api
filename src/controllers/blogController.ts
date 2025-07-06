@@ -1,76 +1,75 @@
-import { NextFunction, Request, Response } from 'express';
-import Blog from '../models/blog';
+import { Response } from 'express';
+import { BlogService } from '../services/blogService';
+import { AuthRequest } from '../middleware/authMiddleware';
 
-export const createBlog = async (req: any, res: Response) => {
-  const { 
-    title, 
-    content 
-  } = req.body;
-  try {
-    const blog = await Blog.create({ title, content, userId: req.user.id });
-    res.status(201).json(blog);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+const blogService = new BlogService();
+
+export const getAll = async (req: AuthRequest, res: Response): Promise<void> => {
+  const blogs = await blogService.getAll();
+  res.json(blogs);
 };
 
-export const getAllBlogs = async (req: Request, res: Response) => {
-  try {
-    const blogs = await Blog.findAll({ include: ['User'] });
-    res.json(blogs);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+export const getById = async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = parseInt(req.params.id);
+  const blog = await blogService.getById(id);
+  if (!blog) {
+    res.status(404).json({ message: 'Blog not found' });
+    return;
   }
+  res.json(blog);
 };
- 
-export const updateBlog = async (req: any, res: Response,next:NextFunction):Promise<void> => {
-  const { id } = req.params;
+
+export const create = async (req: AuthRequest, res: Response): Promise<void> => {
   const { title, content } = req.body;
-
-  try {
-    const blog = await Blog.findByPk(id);
-    if (!blog) {
-    res.status(404).json({ error: 'Blog not found' });
+  const user = req.user!;
+  
+  if (user.role !== 'admin') {
+    res.status(403).json({ message: 'Only admins can create blogs' });
     return;
-    }
-
-    if (req.user.role !== 'admin') {
-    res.status(403).json({ error: 'Only admin can update blogs' });
-    return;
-    }
-
-    blog.title = title || blog.title;
-    blog.content = content || blog.content;
-    await blog.save();
-
-    res.json({ message: 'Blog updated', blog });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
   }
+
+  const blog = await blogService.create({
+    title,
+    content,
+    userId: user.id,
+  });
+
+  res.status(201).json(blog);
 };
 
+export const update = async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = parseInt(req.params.id);
+  const { title, content } = req.body;
+  const user = req.user!;
 
-export const deleteBlog = async (req: any, res: Response,next:NextFunction) => {
-  const { id } = req.params;
-
-  try {
-    const blog = await Blog.findByPk(id);
-    if (!blog) {
-    res.status(404).json({ error: 'Blog not found' });
+  if (user.role !== 'admin') {
+    res.status(403).json({ message: 'Only admins can update blogs' });
     return;
-    }
-
-    if (req.user.role !== 'admin') {
-    res.status(403).json({ error: 'Only admin can delete blogs' });
-    return;
-    }
-
-    await blog.destroy();
-    res.json({ message: 'Blog deleted successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
   }
+
+  const updated = await blogService.update(id, { title, content });
+  if (!updated) {
+    res.status(404).json({ message: 'Blog not found' });
+    return;
+  }
+
+  res.json(updated);
 };
 
+export const deleteblog = async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = parseInt(req.params.id);
+  const user = req.user!;
 
+  if (user.role !== 'admin') {
+    res.status(403).json({ message: 'Only admins can delete blogs' });
+    return;
+  }
 
+  const deleted = await blogService.delete(id);
+  if (!deleted) {
+    res.status(404).json({ message: 'Blog not found' });
+    return;
+  }
+
+  res.json({ message: 'Blog deleted successfully' });
+};

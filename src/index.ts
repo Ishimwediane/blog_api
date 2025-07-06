@@ -1,17 +1,38 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import sequelize from './config/database';
-import userRoutes from './routes/userRoutes';
-import  blogRoutes from './routes/blogRoutes';
+import usersRoutes from './routes/userRoutes';
+import authRoutes from './routes/authRoute';
+import blogRoutes from './routes/blogRoutes'
+import { errorHandler } from './middleware/errorHandler';
+
+//swagger
+import swaggerUi from "swagger-ui-express";
+import swaggerOutput from "./swagger_output.json";
+// import  blogRoutes from './routes/blogRoutes';
 
 dotenv.config();
 const app = express();
 
-app.use(express.json());
-app.use('/api/users', userRoutes);
-app.use('/api/blogs', blogRoutes);
+//Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+//swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerOutput));
+
+// Routes
+
+app.use('/auth', authRoutes);
+app.use('/users', usersRoutes);
+app.use('/blog', blogRoutes);
+
+// Error handling middleware
+app.use(errorHandler);
+
+//app.use('/api/blogs', blogRoutes);
 
 const PORT = process.env.PORT || 5000;
-sequelize.sync().then(() => {
+sequelize.sync({force:true}).then(() => {
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 });

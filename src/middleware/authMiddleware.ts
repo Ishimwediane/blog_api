@@ -1,27 +1,36 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../models/user';
 
-export const protect = async (req: any, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(' ')[1];
+interface JwtPayload {
+  id: number;
+  email: string;
+  role: 'user' | 'admin';
+  iat: number;
+  exp: number;
+}
+
+export interface AuthRequest extends Request {
+  user?: JwtPayload;
+}
+
+export const authenticated = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
   
   if (!token) {
-    res.status(401).json({ message: 'Not authorized' });
-  } else {
-    try {
-      const decoded: any = jwt.verify(token, process.env.JWT_SECRET as string);
-      req.user = await User.findByPk(decoded.userId);
-      next();
-    } catch (err) {
-      res.status(401).json({ message: 'Invalid token' });
-    }
+    res.status(401).json({ message: 'You are not authorized' });
+    return;
   }
-};
-export const adminOnly = (req: any, res: Response, next: NextFunction) => {
-  if (req.user?.role !== 'admin') {
-    res.status(403).json({ message: 'Admins only' });
-  } else {
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+    req.user = decoded;
     next();
+  } catch (err) {
+    res.status(403).json({ message: 'Token is expired or inavalid' });
   }
 };
-
